@@ -8,12 +8,33 @@ import re
 import datetime
 
 import numpy
-
 import torch
 from torch.optim.lr_scheduler import _LRScheduler
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
+from sklearn.model_selection import KFold
+
+torch.manual_seed(2021)
+
+
+class EarlyStop:
+    def __init__(self, early_stop_epoch=5):
+        self.acc = .0
+        self.decline_epoch = 0
+        self.early_stop_epoch = early_stop_epoch
+
+    def __call__(self, acc):
+        if self.acc < acc:
+            self.acc = acc
+            self.decline_epoch = 0
+        else:
+            self.decline_epoch += 1
+
+        if self.decline_epoch == self.early_stop_epoch:
+            return True
+        else:
+            return False
 
 
 def get_network(args):
@@ -163,7 +184,51 @@ def get_network(args):
     return net
 
 
-def get_training_dataloader(mean, std, batch_size=16, num_workers=2, shuffle=True):
+def get_cv_generator(mean, std, batch_size=16, num_workers=2, shuffle=True):
+    """ return cross validation generator
+    Args:
+        mean: mean of cifar100 training dataset
+        std: std of cifar100 training dataset
+        path: path to cifar100 training python dataset
+        batch_size: dataloader batchsize
+        num_workers: dataloader num_works
+        shuffle: whether to shuffle
+    Returns: cv_generator:train and valid dataloader object
+    """
+
+    transform_train = transforms.Compose([
+        #transforms.ToPILImage(),
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(15),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std)
+    ])
+    #cifar100_training = CIFAR100Train(path, transform=transform_train)
+    kfold = KFold(n_splits=5, shuffle=True, random_state=2021)
+    cifar100_training = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform_train)
+
+    for fold, (train_ids, valid_ids) in enumerate(kfold.split(cifar100_training)):
+        print(f'FOLD {fold}')
+        print('----------------------------')
+        train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
+        valid_subsampler = torch.utils.data.SubsetRandomSampler(valid_ids)
+        # Define data loaders for training and testing data in this fold
+        trainloader = torch.utils.data.DataLoader(cifar100_training, batch_size=batch_size, sampler=train_subsampler)
+        validloader = torch.utils.data.DataLoader(cifar100_training, batch_size=batch_size, sampler=valid_subsampler)
+
+        # check
+        # for train_ids, images, labels in trainloader:
+        #     assert numpy.alltrue(numpy.isin(train_ids.numpy(), train_ids))
+
+        yield trainloader, validloader
+
+    # cifar100_training_loader = DataLoader(
+    #     cifar100_training, shuffle=shuffle, num_workers=num_workers, batch_size=batch_size)
+    # return cifar100_training_loader
+
+
+def get_train_dataloader(mean, std, batch_size=16, num_workers=2, shuffle=True):
     """ return training dataloader
     Args:
         mean: mean of cifar100 training dataset
@@ -183,12 +248,13 @@ def get_training_dataloader(mean, std, batch_size=16, num_workers=2, shuffle=Tru
         transforms.ToTensor(),
         transforms.Normalize(mean, std)
     ])
-    #cifar100_training = CIFAR100Train(path, transform=transform_train)
+
     cifar100_training = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform_train)
+
     cifar100_training_loader = DataLoader(
         cifar100_training, shuffle=shuffle, num_workers=num_workers, batch_size=batch_size)
-
     return cifar100_training_loader
+
 
 def get_test_dataloader(mean, std, batch_size=16, num_workers=2, shuffle=True):
     """ return training dataloader
