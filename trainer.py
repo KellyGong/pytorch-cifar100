@@ -2,8 +2,9 @@ import numpy as np
 from conf import settings
 import torch.nn as nn
 import torch.optim as optim
-from utils import WarmUpLR, EarlyStop, get_network, get_cv_generator, get_test_dataloader, get_train_dataloader
+from utils import WarmUpLR, EarlyStop
 import json
+import nni
 
 
 class Trainer:
@@ -52,6 +53,7 @@ class Trainer:
 
             if valid_loader:
                 acc, data_ids, data_correct = self.valid(valid_loader)
+                nni.report_intermediate_result(acc)
                 print(f'Valid Epoch: {epoch}, accuracy: {round(acc, 5)}')
                 if early_stop(acc):
                     break

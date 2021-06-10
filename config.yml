@@ -1,0 +1,17 @@
+authorName: gz
+experimentName: cifar100_all model
+trialConcurrency: 4
+maxExecDuration: 1d
+trainingServicePlatform: local
+# The path to Search Space
+searchSpacePath: nni/search_space.json
+useAnnotation: false
+tuner:
+  builtinTunerName: TPE
+  classArgs:
+    optimize_mode: maximize
+# The path and the running command of trial
+trial:
+  command: python parser_train.py
+  codeDir: .
+  gpuNum: 1

@@ -1,5 +1,6 @@
 import argparse
 from train import train
+import nni
 
 
 if __name__ == '__main__':
@@ -12,5 +13,9 @@ if __name__ == '__main__':
     parser.add_argument('-resume', action='store_true', default=False, help='resume training')
     parser.add_argument('-early_stop', type=int, default=5, help='epoch of early stop')
     args = parser.parse_args()
+
+    param_net = nni.get_next_parameter()['net']
+    args.net = param_net
+    print(f"***** Model: {args.net} *****")
 
     train(args)
